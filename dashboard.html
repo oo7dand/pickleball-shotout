@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dashboard</title>
+  <style>
+    body { font-family: Arial; background:#f4f7f4; max-width:700px; margin:40px auto; padding:20px; }
+    .card { background:white; padding:24px; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.1); margin-bottom:18px; }
+    h1 { color:#14532d; }
+    button { padding:12px 16px; margin:6px 6px 6px 0; border:none; border-radius:6px; cursor:pointer; color:white; }
+    .in { background:#15803d; }
+    .out { background:#b91c1c; }
+    .wait { background:#334155; }
+    .logout { background:#666; }
+  </style>
+</head>
+<body>
+
+<h1>Pickleball Shootout Dashboard</h1>
+
+<div class="card">
+  <h2>Welcome</h2>
+  <p id="player"></p>
+  <button class="logout" onclick="logout()">Log Out</button>
+</div>
+
+<div class="card">
+  <h2>Next Session</h2>
+  <p><strong>Wednesday 6:30 PM</strong></p>
+  <p>Are you in this week?</p>
+
+  <button class="in" onclick="setStatus('in')">I'm In</button>
+  <button class="out" onclick="setStatus('out')">I'm Out</button>
+  <button class="wait" onclick="setStatus('waitlist')">Waitlist</button>
+
+  <p id="status"></p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+const SUPABASE_URL = "https://giqwhoiyqxmydjaicuno.supabase.co";
+const SUPABASE_KEY = "sb_publishable_2561Ydz1YiLOlCDcWCY0qw_jwQMK_8b";
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function checkUser() {
+  const { data } = await supabaseClient.auth.getUser();
+
+  if (!data.user) {
+    window.location.href = "login.html";
+    return;
+  }
+
+  document.getElementById("player").innerText =
+    "Logged in as: " + data.user.email;
+}
+
+function setStatus(status) {
+  document.getElementById("status").innerText =
+    "Status saved locally for now: " + status;
+}
+
+async function logout() {
+  await supabaseClient.auth.signOut();
+  window.location.href = "login.html";
+}
+
+checkUser();
+</script>
+
+</body>
+</html>
