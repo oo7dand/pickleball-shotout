@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login</title>
+  <style>
+    body { font-family: Arial; background:#f4f7f4; max-width:400px; margin:60px auto; padding:20px; }
+    .card { background:white; padding:24px; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.1); }
+    h1 { color:#14532d; }
+    input, button { width:100%; padding:12px; margin-bottom:14px; box-sizing:border-box; }
+    button { background:#15803d; color:white; border:none; border-radius:6px; cursor:pointer; }
+    #message { font-weight:bold; margin-top:12px; }
+    a { color:#14532d; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Player Login</h1>
+
+  <input id="email" type="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+
+  <button onclick="login()">Log In</button>
+
+  <p><a href="signup.html">Create account</a></p>
+
+  <div id="message"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+const SUPABASE_URL = "https://giqwhoiyqxmydjaicuno.supabase.co";
+const SUPABASE_KEY = "sb_publishable_2561Ydz1YiLOlCDcWCY0qw_jwQMK_8b";
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function login() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  const message = document.getElementById("message");
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email: email,
+    password: password
+  });
+
+  if (error) {
+    message.innerText = error.message;
+  } else {
+    window.location.href = "dashboard.html";
+  }
+}
+</script>
+
+</body>
+</html>
