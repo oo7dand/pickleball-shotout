@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Sign Up</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      max-width: 400px;
+      margin: 60px auto;
+      padding: 20px;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 12px;
+      box-sizing: border-box;
+    }
+
+    button {
+      background: green;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    .message {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>Create Account</h1>
+
+<input id="username" placeholder="Username">
+
+<input id="password" type="password" placeholder="Password">
+
+<button onclick="signup()">
+  Create Account
+</button>
+
+<div class="message" id="message"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+<script>
+
+const SUPABASE_URL =
+  "https://giqwhoiyqxmydjaicuno.supabase.co";
+
+const SUPABASE_KEY =
+  "PASTE_YOUR_PUBLISHABLE_KEY_HERE";
+
+const supabase = window.supabase.createClient(
+  SUPABASE_URL,
+  sb_publishable_2561Ydz1YiLOlCDcWCY0qw_jwQMK_8b
+);
+
+async function signup() {
+
+  const username =
+    document.getElementById("username").value;
+
+  const password =
+    document.getElementById("password").value;
+
+  const fakeEmail =
+    username + "@shootout.local";
+
+  const { data, error } =
+    await supabase.auth.signUp({
+
+      email: fakeEmail,
+      password: password
+
+    });
+
+  if(error) {
+
+    document.getElementById("message").innerText =
+      error.message;
+
+  } else {
+
+    document.getElementById("message").innerText =
+      "Account created successfully!";
+
+  }
+
+}
+
+</script>
+
+</body>
+</html>
