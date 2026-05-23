@@ -55,9 +55,28 @@ async function checkUser() {
     "Logged in as: " + data.user.email;
 }
 
-function setStatus(status) {
-  document.getElementById("status").innerText =
-    "Status saved locally for now: " + status;
+async function setStatus(status) {
+  const { data } = await supabaseClient.auth.getUser();
+
+  if (!data.user) {
+    window.location.href = "login.html";
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from("session_signups")
+    .insert({
+      user_id: data.user.id,
+      status: status
+    });
+
+  if (error) {
+    document.getElementById("status").innerText =
+      error.message;
+  } else {
+    document.getElementById("status").innerText =
+      "Saved: " + status;
+  }
 }
 
 async function logout() {
