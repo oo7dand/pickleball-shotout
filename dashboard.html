@@ -63,10 +63,13 @@ async function setStatus(status) {
     return;
   }
 
+  const sessionDate = "2026-06-03";
+
   const { error } = await supabaseClient
     .from("session_signups")
-    .insert({
+    .upsert({
       user_id: data.user.id,
+      session_date: sessionDate,
       status: status
     });
 
