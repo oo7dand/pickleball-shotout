@@ -57,7 +57,15 @@ async function signup() {
   if (error) {
     message.innerText = error.message;
   } else {
-    message.innerText = "Account created. Check email if confirmation is required.";
+    await supabaseClient
+  .from("profiles")
+  .insert({
+    id: data.user.id,
+    username: username
+  });
+
+message.innerText =
+  "Account created successfully!";
   }
 }
 </script>
