@@ -57,7 +57,7 @@ async function signup() {
   if (error) {
     message.innerText = error.message;
   } else {
-    await supabaseClient
+   await supabaseClient
   .from("profiles")
   .insert({
     id: data.user.id,
@@ -66,8 +66,8 @@ async function signup() {
 
 message.innerText =
   "Account created successfully!";
-  }
 }
+  }
 </script>
 
 </body>
