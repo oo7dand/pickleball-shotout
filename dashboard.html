@@ -67,11 +67,16 @@ async function setStatus(status) {
 
   const { error } = await supabaseClient
     .from("session_signups")
-    .upsert({
-      user_id: data.user.id,
-      session_date: sessionDate,
-      status: status
-    });
+.upsert(
+  {
+    user_id: data.user.id,
+    session_date: sessionDate,
+    status: status
+  },
+  {
+    onConflict: "user_id,session_date"
+  }
+);
 
   if (error) {
     document.getElementById("status").innerText =
