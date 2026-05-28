@@ -17,6 +17,7 @@
       padding: 24px;
       border-radius: 12px;
       box-shadow: 0 2px 10px rgba(0,0,0,.1);
+      margin-bottom: 20px;
     }
 
     h1 {
@@ -33,11 +34,25 @@
       font-size: 16px;
     }
 
-    .inBtn { background: #15803d; }
-    .outBtn { background: #dc2626; }
-    .waitBtn { background: #334155; }
+    .inBtn {
+      background: #15803d;
+    }
 
-    #status, #countInfo {
+    .outBtn {
+      background: #dc2626;
+    }
+
+    .waitBtn {
+      background: #334155;
+    }
+
+    .logoutBtn {
+      background: #666;
+      float: right;
+    }
+
+    #status,
+    #countInfo {
       margin-top: 18px;
       font-weight: bold;
     }
@@ -46,6 +61,11 @@
       margin-bottom: 20px;
       line-height: 1.6;
     }
+
+    #userInfo {
+      margin-bottom: 12px;
+      font-weight: bold;
+    }
   </style>
 </head>
 
@@ -53,21 +73,65 @@
 
 <div class="card">
 
-  <h1 id="sessionTitle">Loading session...</h1>
+  <button class="logoutBtn" onclick="logout()">
+    Log Out
+  </button>
 
-  <div class="sessionInfo">
-    <div><strong>Date:</strong> <span id="sessionDate"></span></div>
-    <div><strong>Time:</strong> <span id="sessionTime"></span></div>
-    <div><strong>Max Players:</strong> <span id="maxPlayers"></span></div>
+  <div id="userInfo">
+    Loading user...
   </div>
 
-  <div id="countInfo">Loading signup count...</div>
+  <h1 id="sessionTitle">
+    Loading session...
+  </h1>
 
-  <p>Are you in this week?</p>
+  <div class="sessionInfo">
 
-  <button class="inBtn" onclick="setStatus('in')">I'm In</button>
-  <button class="outBtn" onclick="setStatus('out')">I'm Out</button>
-  <button class="waitBtn" onclick="setStatus('waitlist')">Waitlist</button>
+    <div>
+      <strong>Date:</strong>
+      <span id="sessionDate"></span>
+    </div>
+
+    <div>
+      <strong>Time:</strong>
+      <span id="sessionTime"></span>
+    </div>
+
+    <div>
+      <strong>Max Players:</strong>
+      <span id="maxPlayers"></span>
+    </div>
+
+  </div>
+
+  <div id="countInfo">
+    Loading signup count...
+  </div>
+
+  <p>
+    Are you in this week?
+  </p>
+
+  <button
+    class="inBtn"
+    onclick="setStatus('in')"
+  >
+    I'm In
+  </button>
+
+  <button
+    class="outBtn"
+    onclick="setStatus('out')"
+  >
+    I'm Out
+  </button>
+
+  <button
+    class="waitBtn"
+    onclick="setStatus('waitlist')"
+  >
+    Waitlist
+  </button>
 
   <div id="status"></div>
 
@@ -76,90 +140,178 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-const SUPABASE_URL = "https://giqwhoiyqxmydjaicuno.supabase.co";
-const SUPABASE_KEY = "sb_publishable_2561Ydz1YiLOlCDcWCY0qw_jwQMK_8b";
 
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_URL =
+  "https://giqwhoiyqxmydjaicuno.supabase.co";
+
+const SUPABASE_KEY =
+  "sb_publishable_2561Ydz1YiLOlCDcWCY0qw_jwQMK_8b";
+
+const supabaseClient =
+  supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
 
 let currentSession = null;
 
-async function loadSession() {
-  const { data, error } = await supabaseClient
-    .from("sessions")
-    .select("*")
-    .order("session_date", { ascending: true })
-    .limit(1)
-    .single();
+async function loadUser() {
 
-  if (error) {
-    document.getElementById("sessionTitle").innerText = "No session found";
+  const { data } =
+    await supabaseClient.auth.getUser();
+
+  if(!data.user) {
+
+    window.location.href =
+      "login.html";
+
+    return;
+  }
+
+  document.getElementById("userInfo").innerText =
+    "Logged in as: " +
+    data.user.email;
+}
+
+async function loadSession() {
+
+  const { data, error } =
+    await supabaseClient
+      .from("sessions")
+      .select("*")
+      .order("session_date", { ascending: true })
+      .limit(1)
+      .single();
+
+  if(error) {
+
+    document.getElementById("sessionTitle").innerText =
+      "No session found";
+
     return;
   }
 
   currentSession = data;
 
-  document.getElementById("sessionTitle").innerText = data.title;
-  document.getElementById("sessionDate").innerText = data.session_date;
-  document.getElementById("sessionTime").innerText = data.start_time;
-  document.getElementById("maxPlayers").innerText = data.max_players;
+  document.getElementById("sessionTitle").innerText =
+    data.title;
+
+  document.getElementById("sessionDate").innerText =
+    data.session_date;
+
+  document.getElementById("sessionTime").innerText =
+    data.start_time;
+
+  document.getElementById("maxPlayers").innerText =
+    data.max_players;
 
   loadSignupCount();
 }
 
 async function loadSignupCount() {
-  if (!currentSession) return;
 
-  const { data, error } = await supabaseClient
-    .from("session_signups")
-    .select("*")
-    .eq("session_date", currentSession.session_date)
-    .eq("status", "in");
-
-  if (error) {
-    document.getElementById("countInfo").innerText = error.message;
+  if(!currentSession) {
     return;
   }
 
-  const count = data.length;
-  const spotsLeft = currentSession.max_players - count;
+  const { data, error } =
+    await supabaseClient
+      .from("session_signups")
+      .select("*")
+      .eq(
+        "session_date",
+        currentSession.session_date
+      )
+      .eq(
+        "status",
+        "in"
+      );
+
+  if(error) {
+
+    document.getElementById("countInfo").innerText =
+      error.message;
+
+    return;
+  }
+
+  const count =
+    data.length;
+
+  const spotsLeft =
+    currentSession.max_players - count;
 
   document.getElementById("countInfo").innerText =
-    count + " / " + currentSession.max_players + " players in — " +
-    spotsLeft + " spots remaining";
+    count +
+    " / " +
+    currentSession.max_players +
+    " players in — " +
+    spotsLeft +
+    " spots remaining";
 }
 
 async function setStatus(status) {
-  if (!currentSession) return;
 
-  const { data } = await supabaseClient.auth.getUser();
-
-  if (!data.user) {
-    window.location.href = "login.html";
+  if(!currentSession) {
     return;
   }
 
-  const { error } = await supabaseClient
-    .from("session_signups")
-    .upsert(
-      {
-        user_id: data.user.id,
-        session_date: currentSession.session_date,
-        status: status
-      },
-      {
-        onConflict: "user_id,session_date"
-      }
-    );
+  const { data } =
+    await supabaseClient.auth.getUser();
 
-  if (error) {
-    document.getElementById("status").innerText = error.message;
+  if(!data.user) {
+
+    window.location.href =
+      "login.html";
+
+    return;
+  }
+
+  const { error } =
+    await supabaseClient
+      .from("session_signups")
+      .upsert(
+        {
+          user_id:
+            data.user.id,
+
+          session_date:
+            currentSession.session_date,
+
+          status:
+            status
+        },
+        {
+          onConflict:
+            "user_id,session_date"
+        }
+      );
+
+  if(error) {
+
+    document.getElementById("status").innerText =
+      error.message;
+
   } else {
-    document.getElementById("status").innerText = "Saved: " + status;
+
+    document.getElementById("status").innerText =
+      "Saved: " + status;
+
     loadSignupCount();
   }
 }
 
+async function logout() {
+
+  await supabaseClient.auth.signOut();
+
+  window.location.href =
+    "login.html";
+}
+
+loadUser();
 loadSession();
+
 </script>
 
 </body>
