@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin</title>
+
+  <style>
+    body { font-family: Arial; background:#f4f7f4; max-width:1000px; margin:40px auto; padding:20px; }
+    .card { background:white; padding:24px; border-radius:12px; margin-bottom:20px; box-shadow:0 2px 10px rgba(0,0,0,.1); }
+    h1 { color:#14532d; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:12px; border-bottom:1px solid #ddd; text-align:left; }
+    .in { color:green; font-weight:bold; }
+    .out { color:red; font-weight:bold; }
+    .waitlist { color:#334155; font-weight:bold; }
+    .summary { font-size:18px; font-weight:bold; margin-bottom:18px; }
+  </style>
+</head>
+
+<body>
+
+<h1>Admin Dashboard</h1>
+
+<div class="card">
+  <h2>Current Session</h2>
+  <div id="sessionInfo">Loading...</div>
+</div>
+
+<div class="card">
+  <h2>Current Session Signups</h2>
+  <div class="summary" id="summaryInfo"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>Status</th>
+        <th>Session</th>
+      </tr>
+    </thead>
+
+    <tbody id="signupTable"></tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+const SUPABASE_URL = "https://giqwhoiyqxmydjaicuno.supabase.co";
+const SUPABASE_KEY = "sb_publishable_2561Ydz1YiLOlCDcWCY0qw_jwQMK_8b";
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentSession = null;
+
+async function loadSession() {
+  const { data, error } = await supabaseClient
+    .from("sessions")
+    .select("*")
+    .order("session_date", { ascending: true })
+    .limit(1)
+    .single();
+
+  if (error) {
+    document.getElementById("sessionInfo").innerText = "No session found.";
+    return;
+  }
+
+  currentSession = data;
+
+  document.getElementById("sessionInfo").innerText =
+    data.title + " — " + data.session_date + " at " + data.start_time +
+    " — Max players: " + data.max_players;
+
+  loadSignups();
+}
+
+async function loadSignups() {
+  if (!currentSession) return;
+
+  const { data: signups, error: signupError } = await supabaseClient
+    .from("session_signups")
+    .select("*")
+    .eq("session_date", currentSession.session_date)
+    .order("status", { ascending: true });
+
+  if (signupError) {
+    document.getElementById("signupTable").innerHTML =
+      "<tr><td colspan='3'>Error loading signups: " + signupError.message + "</td></tr>";
+    return;
+  }
+
+  const { data: profiles } = await supabaseClient
+    .from("profiles")
+    .select("*");
+
+  const profileMap = {};
+
+  if (profiles) {
+    profiles.forEach(profile => {
+      profileMap[profile.id] = profile.username;
+    });
+  }
+
+  const inCount = signups.filter(s => s.status === "in").length;
+  const outCount = signups.filter(s => s.status === "out").length;
+  const waitCount = signups.filter(s => s.status === "waitlist").length;
+  const spotsLeft = currentSession.max_players - inCount;
+
+  document.getElementById("summaryInfo").innerText =
+    inCount + " IN / " +
+    outCount + " OUT / " +
+    waitCount + " WAITLIST — " +
+    spotsLeft + " spots remaining";
+
+  const table = document.getElementById("signupTable");
+  table.innerHTML = "";
+
+  signups.forEach(signup => {
+    const playerName = profileMap[signup.user_id] || signup.user_id;
+
+    table.innerHTML += `
+      <tr>
+        <td>${playerName}</td>
+        <td class="${signup.status}">${signup.status}</td>
+        <td>${signup.session_date}</td>
+      </tr>
+    `;
+  });
+}
+
+loadSession();
+</script>
+
+</body>
+</html>
