@@ -33,25 +33,18 @@
       font-size: 16px;
     }
 
-    .inBtn {
-      background: #15803d;
-    }
+    .inBtn { background: #15803d; }
+    .outBtn { background: #dc2626; }
+    .waitBtn { background: #334155; }
 
-    .outBtn {
-      background: #dc2626;
-    }
-
-    .waitBtn {
-      background: #334155;
-    }
-
-    #status {
+    #status, #countInfo {
       margin-top: 18px;
       font-weight: bold;
     }
 
     .sessionInfo {
       margin-bottom: 20px;
+      line-height: 1.6;
     }
   </style>
 </head>
@@ -63,35 +56,18 @@
   <h1 id="sessionTitle">Loading session...</h1>
 
   <div class="sessionInfo">
-    <div>
-      <strong>Date:</strong>
-      <span id="sessionDate"></span>
-    </div>
-
-    <div>
-      <strong>Time:</strong>
-      <span id="sessionTime"></span>
-    </div>
-
-    <div>
-      <strong>Max Players:</strong>
-      <span id="maxPlayers"></span>
-    </div>
+    <div><strong>Date:</strong> <span id="sessionDate"></span></div>
+    <div><strong>Time:</strong> <span id="sessionTime"></span></div>
+    <div><strong>Max Players:</strong> <span id="maxPlayers"></span></div>
   </div>
+
+  <div id="countInfo">Loading signup count...</div>
 
   <p>Are you in this week?</p>
 
-  <button class="inBtn" onclick="setStatus('in')">
-    I'm In
-  </button>
-
-  <button class="outBtn" onclick="setStatus('out')">
-    I'm Out
-  </button>
-
-  <button class="waitBtn" onclick="setStatus('waitlist')">
-    Waitlist
-  </button>
+  <button class="inBtn" onclick="setStatus('in')">I'm In</button>
+  <button class="outBtn" onclick="setStatus('out')">I'm Out</button>
+  <button class="waitBtn" onclick="setStatus('waitlist')">Waitlist</button>
 
   <div id="status"></div>
 
@@ -100,99 +76,90 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+const SUPABASE_URL = "https://giqwhoiyqxmydjaicuno.supabase.co";
+const SUPABASE_KEY = "sb_publishable_2561Ydz1YiLOlCDcWCY0qw_jwQMK_8b";
 
-const SUPABASE_URL =
-  "https://giqwhoiyqxmydjaicuno.supabase.co";
-
-const SUPABASE_KEY =
-  "sb_publishable_2561Ydz1YiLOlCDcWCY0qw_jwQMK_8b";
-
-const supabaseClient =
-  supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY
-  );
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentSession = null;
 
 async function loadSession() {
+  const { data, error } = await supabaseClient
+    .from("sessions")
+    .select("*")
+    .order("session_date", { ascending: true })
+    .limit(1)
+    .single();
 
-  const { data, error } =
-    await supabaseClient
-      .from("sessions")
-      .select("*")
-      .order("session_date", { ascending: true })
-      .limit(1)
-      .single();
-
-  if(error) {
-
-    document.getElementById("sessionTitle").innerText =
-      "No session found";
-
+  if (error) {
+    document.getElementById("sessionTitle").innerText = "No session found";
     return;
   }
 
   currentSession = data;
 
-  document.getElementById("sessionTitle").innerText =
-    data.title;
+  document.getElementById("sessionTitle").innerText = data.title;
+  document.getElementById("sessionDate").innerText = data.session_date;
+  document.getElementById("sessionTime").innerText = data.start_time;
+  document.getElementById("maxPlayers").innerText = data.max_players;
 
-  document.getElementById("sessionDate").innerText =
-    data.session_date;
+  loadSignupCount();
+}
 
-  document.getElementById("sessionTime").innerText =
-    data.start_time;
+async function loadSignupCount() {
+  if (!currentSession) return;
 
-  document.getElementById("maxPlayers").innerText =
-    data.max_players;
+  const { data, error } = await supabaseClient
+    .from("session_signups")
+    .select("*")
+    .eq("session_date", currentSession.session_date)
+    .eq("status", "in");
+
+  if (error) {
+    document.getElementById("countInfo").innerText = error.message;
+    return;
+  }
+
+  const count = data.length;
+  const spotsLeft = currentSession.max_players - count;
+
+  document.getElementById("countInfo").innerText =
+    count + " / " + currentSession.max_players + " players in — " +
+    spotsLeft + " spots remaining";
 }
 
 async function setStatus(status) {
+  if (!currentSession) return;
 
-  if(!currentSession) {
-    return;
-  }
-
-  const { data } =
-    await supabaseClient.auth.getUser();
+  const { data } = await supabaseClient.auth.getUser();
 
   if (!data.user) {
-
-    window.location.href =
-      "login.html";
-
+    window.location.href = "login.html";
     return;
   }
 
-  const { error } =
-    await supabaseClient
-      .from("session_signups")
-      .upsert(
-        {
-          user_id: data.user.id,
-          session_date: currentSession.session_date,
-          status: status
-        },
-        {
-          onConflict: "user_id,session_date"
-        }
-      );
+  const { error } = await supabaseClient
+    .from("session_signups")
+    .upsert(
+      {
+        user_id: data.user.id,
+        session_date: currentSession.session_date,
+        status: status
+      },
+      {
+        onConflict: "user_id,session_date"
+      }
+    );
 
-  if(error) {
-
-    document.getElementById("status").innerText =
-      error.message;
-
+  if (error) {
+    document.getElementById("status").innerText = error.message;
   } else {
-
-    document.getElementById("status").innerText =
-      "Saved: " + status;
+    document.getElementById("status").innerText = "Saved: " + status;
+    loadSignupCount();
   }
 }
 
 loadSession();
-
 </script>
 
 </body>
