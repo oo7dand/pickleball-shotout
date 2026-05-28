@@ -92,30 +92,35 @@ const supabaseClient =
 
 async function loadSignups() {
 
-  const { data, error } =
+  const { data: signups, error: signupError } =
     await supabaseClient
       .from("session_signups")
-      .select(`
-        *,
-        profiles (
-          username
-        )
-      `)
+      .select("*")
       .order("created_at", { ascending: false });
 
-  if(error) {
-    console.log(error);
-
+  if (signupError) {
     document.getElementById("signupTable").innerHTML =
       `
         <tr>
           <td colspan="3">
-            Error loading signups: ${error.message}
+            Error loading signups: ${signupError.message}
           </td>
         </tr>
       `;
-
     return;
+  }
+
+  const { data: profiles, error: profileError } =
+    await supabaseClient
+      .from("profiles")
+      .select("*");
+
+  const profileMap = {};
+
+  if (profiles) {
+    profiles.forEach(profile => {
+      profileMap[profile.id] = profile.username;
+    });
   }
 
   const table =
@@ -123,10 +128,10 @@ async function loadSignups() {
 
   table.innerHTML = "";
 
-  data.forEach(signup => {
+  signups.forEach(signup => {
 
     const playerName =
-      signup.profiles?.username || signup.user_id;
+      profileMap[signup.user_id] || signup.user_id;
 
     table.innerHTML += `
       <tr>
