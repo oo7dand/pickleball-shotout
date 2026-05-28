@@ -4,69 +4,21 @@
   <title>Admin</title>
 
   <style>
-    body {
-      font-family: Arial;
-      background:#f4f7f4;
-      max-width:1200px;
-      margin:40px auto;
-      padding:20px;
-    }
-
-    .card {
-      background:white;
-      padding:24px;
-      border-radius:12px;
-      margin-bottom:20px;
-      box-shadow:0 2px 10px rgba(0,0,0,.1);
-    }
-
-    h1 {
-      color:#14532d;
-    }
-
-    table {
-      width:100%;
-      border-collapse:collapse;
-    }
-
-    th, td {
-      padding:10px;
-      border-bottom:1px solid #ddd;
-      text-align:left;
-    }
-
-    input {
-      width:80px;
-      padding:6px;
-    }
-
-    button {
-      padding:8px 12px;
-      border:none;
-      border-radius:6px;
-      cursor:pointer;
-      background:#14532d;
-      color:white;
-    }
-
-    .court {
-      margin-top:20px;
-      padding:16px;
-      border:1px solid #ddd;
-      border-radius:8px;
-    }
-
-    .match {
-      border:1px solid #ddd;
-      padding:12px;
-      margin-top:12px;
-      border-radius:8px;
-    }
-
-    .playerRow {
-      padding:8px 0;
-      border-bottom:1px solid #eee;
-    }
+    body { font-family: Arial; background:#f4f7f4; max-width:1200px; margin:40px auto; padding:20px; }
+    .card { background:white; padding:24px; border-radius:12px; margin-bottom:20px; box-shadow:0 2px 10px rgba(0,0,0,.1); }
+    h1 { color:#14532d; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left; }
+    input { width:80px; padding:6px; }
+    .wide { width:160px; }
+    button { padding:8px 12px; border:none; border-radius:6px; cursor:pointer; background:#14532d; color:white; }
+    .court { margin-top:20px; padding:16px; border:1px solid #ddd; border-radius:8px; }
+    .match { border:1px solid #ddd; padding:12px; margin-top:12px; border-radius:8px; }
+    .playerRow { padding:8px 0; border-bottom:1px solid #eee; }
+    .in { color:green; font-weight:bold; }
+    .out { color:red; font-weight:bold; }
+    .waitlist { color:#334155; font-weight:bold; }
+    #saveMessage { font-weight:bold; margin-top:12px; }
   </style>
 </head>
 
@@ -75,40 +27,50 @@
 <h1>Admin Dashboard</h1>
 
 <div class="card">
-
-  <h2>Court Generator</h2>
-
-  <button onclick="generateCourts()">
-    Generate Courts
-  </button>
-
-  <div id="courtsContainer"></div>
-
+  <h2>Current Session</h2>
+  <div id="sessionInfo">Loading...</div>
 </div>
 
 <div class="card">
+  <h2>Manage Players</h2>
+  <p>Edit ladder rank here. DUPR is display only.</p>
 
+  <table>
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>DUPR</th>
+        <th>DUPR Link</th>
+        <th>Ladder Rank</th>
+        <th>Waitlist</th>
+        <th>Status</th>
+        <th>Save</th>
+      </tr>
+    </thead>
+    <tbody id="playersTable"></tbody>
+  </table>
+
+  <div id="saveMessage"></div>
+</div>
+
+<div class="card">
+  <h2>Court Assignments</h2>
+  <button onclick="generateCourts()">Generate Courts</button>
+  <div id="courtsContainer"></div>
+</div>
+
+<div class="card">
   <h2>Match Entry</h2>
-
   <div id="matchesContainer"></div>
-
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+const SUPABASE_URL = "https://giqwhoiyqxmydjaicuno.supabase.co";
+const SUPABASE_KEY = "sb_publishable_2561Ydz1YiLOlCDcWCY0qw_jwQMK_8b";
 
-const SUPABASE_URL =
-  "https://giqwhoiyqxmydjaicuno.supabase.co";
-
-const SUPABASE_KEY =
-  "sb_publishable_2561Ydz1YiLOlCDcWCY0qw_jwQMK_8b";
-
-const supabaseClient =
-  supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY
-  );
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentSession = null;
 let allPlayers = [];
@@ -116,66 +78,145 @@ let signupMap = {};
 let activePlayers = [];
 
 async function initialize() {
+  const { data: session, error: sessionError } = await supabaseClient
+    .from("sessions")
+    .select("*")
+    .order("session_date", { ascending: true })
+    .limit(1)
+    .single();
 
-  const { data: session } =
-    await supabaseClient
-      .from("sessions")
-      .select("*")
-      .order("session_date", { ascending: true })
-      .limit(1)
-      .single();
+  if (sessionError) {
+    document.getElementById("sessionInfo").innerText = "No session found.";
+    return;
+  }
 
   currentSession = session;
 
-  const { data: profiles } =
-    await supabaseClient
-      .from("profiles")
-      .select("*");
+  document.getElementById("sessionInfo").innerText =
+    session.title + " — " + session.session_date + " — " + session.start_time;
 
-  const { data: signups } =
-    await supabaseClient
-      .from("session_signups")
-      .select("*")
-      .eq("session_date", currentSession.session_date);
+  await loadPlayersAndSignups();
+}
+
+async function loadPlayersAndSignups() {
+  const { data: profiles, error: profileError } = await supabaseClient
+    .from("profiles")
+    .select("*")
+    .order("ladder_rank", { ascending: true });
+
+  if (profileError) {
+    document.getElementById("playersTable").innerHTML =
+      "<tr><td colspan='7'>Error loading players: " + profileError.message + "</td></tr>";
+    return;
+  }
+
+  const { data: signups } = await supabaseClient
+    .from("session_signups")
+    .select("*")
+    .eq("session_date", currentSession.session_date);
 
   signupMap = {};
 
-  signups.forEach(signup => {
-    signupMap[signup.user_id] = signup.status;
+  if (signups) {
+    signups.forEach(signup => {
+      signupMap[signup.user_id] = signup.status;
+    });
+  }
+
+  allPlayers = profiles || [];
+
+  renderPlayers();
+}
+
+function renderPlayers() {
+  const table = document.getElementById("playersTable");
+  table.innerHTML = "";
+
+  allPlayers.forEach(player => {
+    const status = signupMap[player.id] || "-";
+
+    table.innerHTML += `
+      <tr>
+        <td>${player.username || "-"}</td>
+
+        <td>
+          <input id="dupr-${player.id}" type="number" step="0.01" value="${player.dupr || ""}">
+        </td>
+
+        <td>
+          <input class="wide" id="duprlink-${player.id}" type="text" value="${player.dupr_link || ""}">
+        </td>
+
+        <td>
+          <input id="rank-${player.id}" type="number" value="${player.ladder_rank || ""}">
+        </td>
+
+        <td>
+          <input id="wait-${player.id}" type="number" value="${player.waitlist_position || ""}">
+        </td>
+
+        <td class="${status}">
+          ${status}
+        </td>
+
+        <td>
+          <button onclick="savePlayer('${player.id}')">Save</button>
+        </td>
+      </tr>
+    `;
   });
+}
 
-  allPlayers = profiles;
+async function savePlayer(playerId) {
+  const duprRaw = document.getElementById("dupr-" + playerId).value;
+  const duprLink = document.getElementById("duprlink-" + playerId).value.trim();
+  const rankRaw = document.getElementById("rank-" + playerId).value;
+  const waitRaw = document.getElementById("wait-" + playerId).value;
 
-  activePlayers =
-    profiles
-      .filter(player =>
-        signupMap[player.id] === "in"
-      )
-      .sort((a, b) =>
-        a.ladder_rank - b.ladder_rank
-      );
+  const dupr = duprRaw === "" ? null : Number(duprRaw);
+  const ladderRank = rankRaw === "" ? null : Number(rankRaw);
+  const waitlistPosition = waitRaw === "" ? null : Number(waitRaw);
+
+  const { error } = await supabaseClient
+    .from("profiles")
+    .update({
+      dupr: dupr,
+      dupr_link: duprLink,
+      ladder_rank: ladderRank,
+      waitlist_position: waitlistPosition
+    })
+    .eq("id", playerId);
+
+  if (error) {
+    document.getElementById("saveMessage").innerText = "Error: " + error.message;
+  } else {
+    document.getElementById("saveMessage").innerText = "Player saved.";
+    await loadPlayersAndSignups();
+  }
 }
 
 function generateCourts() {
+  const courtsContainer = document.getElementById("courtsContainer");
+  const matchesContainer = document.getElementById("matchesContainer");
 
-  const container =
-    document.getElementById("courtsContainer");
-
-  const matchesContainer =
-    document.getElementById("matchesContainer");
-
-  container.innerHTML = "";
+  courtsContainer.innerHTML = "";
   matchesContainer.innerHTML = "";
+
+  activePlayers = allPlayers
+    .filter(player => signupMap[player.id] === "in")
+    .filter(player => player.ladder_rank !== null)
+    .sort((a, b) => a.ladder_rank - b.ladder_rank);
 
   const playersPerCourt = 5;
 
-  for(let i = 0; i < activePlayers.length; i += playersPerCourt) {
+  if (activePlayers.length === 0) {
+    courtsContainer.innerHTML = "<p>No players marked IN with ladder ranks.</p>";
+    return;
+  }
 
-    const courtPlayers =
-      activePlayers.slice(i, i + playersPerCourt);
-
-    const courtNumber =
-      (i / playersPerCourt) + 1;
+  for (let i = 0; i < activePlayers.length; i += playersPerCourt) {
+    const courtPlayers = activePlayers.slice(i, i + playersPerCourt);
+    const courtNumber = (i / playersPerCourt) + 1;
 
     let courtHtml = `
       <div class="court">
@@ -183,237 +224,109 @@ function generateCourts() {
     `;
 
     courtPlayers.forEach(player => {
-
       courtHtml += `
         <div class="playerRow">
-          #${player.ladder_rank}
-          —
-          ${player.username}
-          ${
-            player.dupr
-              ? `(DUPR ${player.dupr})`
-              : ""
-          }
+          #${player.ladder_rank} — ${player.username}
+          ${player.dupr ? `(DUPR ${player.dupr})` : ""}
         </div>
       `;
     });
 
     courtHtml += `</div>`;
+    courtsContainer.innerHTML += courtHtml;
 
-    container.innerHTML += courtHtml;
-
-    generateMatches(
-      courtPlayers,
-      courtNumber
-    );
+    generateMatches(courtPlayers, courtNumber);
   }
-
 }
 
 function generateMatches(players, courtNumber) {
-
-  if(players.length < 5) {
+  if (players.length < 5) {
     return;
   }
 
   const rounds = [
-
-    {
-      round: 1,
-      team1: [0,1],
-      team2: [2,3],
-      bye: 4
-    },
-
-    {
-      round: 2,
-      team1: [0,2],
-      team2: [1,4],
-      bye: 3
-    },
-
-    {
-      round: 3,
-      team1: [0,3],
-      team2: [2,4],
-      bye: 1
-    },
-
-    {
-      round: 4,
-      team1: [0,4],
-      team2: [1,3],
-      bye: 2
-    },
-
-    {
-      round: 5,
-      team1: [1,2],
-      team2: [3,4],
-      bye: 0
-    }
-
+    { round: 1, team1: [0,1], team2: [2,3], bye: 4 },
+    { round: 2, team1: [0,2], team2: [1,4], bye: 3 },
+    { round: 3, team1: [0,3], team2: [2,4], bye: 1 },
+    { round: 4, team1: [0,4], team2: [1,3], bye: 2 },
+    { round: 5, team1: [1,2], team2: [3,4], bye: 0 }
   ];
 
-  const matchesContainer =
-    document.getElementById("matchesContainer");
+  const matchesContainer = document.getElementById("matchesContainer");
 
-  let html =
-    `<div class="court">
-      <h3>Court ${courtNumber} Matches</h3>`;
+  let html = `
+    <div class="court">
+      <h3>Court ${courtNumber} Matches</h3>
+  `;
 
   rounds.forEach(r => {
-
-    const t1p1 =
-      players[r.team1[0]];
-
-    const t1p2 =
-      players[r.team1[1]];
-
-    const t2p1 =
-      players[r.team2[0]];
-
-    const t2p2 =
-      players[r.team2[1]];
-
-    const bye =
-      players[r.bye];
+    const t1p1 = players[r.team1[0]];
+    const t1p2 = players[r.team1[1]];
+    const t2p1 = players[r.team2[0]];
+    const t2p2 = players[r.team2[1]];
+    const bye = players[r.bye];
 
     html += `
       <div class="match">
-
-        <strong>
-          Round ${r.round}
-        </strong>
+        <strong>Round ${r.round}</strong>
 
         <p>
-          ${t1p1.username}
-          /
-          ${t1p2.username}
-
+          ${t1p1.username} / ${t1p2.username}
           vs
-
-          ${t2p1.username}
-          /
-          ${t2p2.username}
+          ${t2p1.username} / ${t2p2.username}
         </p>
 
-        <p>
-          Bye:
-          ${bye.username}
-        </p>
+        <p>Bye: ${bye.username}</p>
 
-        <input
-          id="score1-${courtNumber}-${r.round}"
-          type="number"
-          placeholder="Team 1"
-        >
+        <input id="score1-${courtNumber}-${r.round}" type="number" placeholder="Team 1">
+        <input id="score2-${courtNumber}-${r.round}" type="number" placeholder="Team 2">
 
-        <input
-          id="score2-${courtNumber}-${r.round}"
-          type="number"
-          placeholder="Team 2"
-        >
-
-        <button
-          onclick="saveMatch(
-            ${courtNumber},
-            ${r.round},
-            '${t1p1.id}',
-            '${t1p2.id}',
-            '${t2p1.id}',
-            '${t2p2.id}',
-            '${bye.id}'
-          )"
-        >
+        <button onclick="saveMatch(
+          ${courtNumber},
+          ${r.round},
+          '${t1p1.id}',
+          '${t1p2.id}',
+          '${t2p1.id}',
+          '${t2p2.id}',
+          '${bye.id}'
+        )">
           Save Match
         </button>
-
       </div>
     `;
   });
 
   html += `</div>`;
-
   matchesContainer.innerHTML += html;
 }
 
-async function saveMatch(
-  courtNumber,
-  roundNumber,
-  t1p1,
-  t1p2,
-  t2p1,
-  t2p2,
-  bye
-) {
+async function saveMatch(courtNumber, roundNumber, t1p1, t1p2, t2p1, t2p2, bye) {
+  const score1 = Number(document.getElementById(`score1-${courtNumber}-${roundNumber}`).value);
+  const score2 = Number(document.getElementById(`score2-${courtNumber}-${roundNumber}`).value);
 
-  const score1 =
-    Number(
-      document.getElementById(
-        `score1-${courtNumber}-${roundNumber}`
-      ).value
-    );
+  const { error } = await supabaseClient
+    .from("matches")
+    .insert({
+      session_date: currentSession.session_date,
+      court_number: courtNumber,
+      round_number: roundNumber,
+      team1_player1: t1p1,
+      team1_player2: t1p2,
+      team2_player1: t2p1,
+      team2_player2: t2p2,
+      bye_player: bye,
+      team1_score: score1,
+      team2_score: score2
+    });
 
-  const score2 =
-    Number(
-      document.getElementById(
-        `score2-${courtNumber}-${roundNumber}`
-      ).value
-    );
-
-  const { error } =
-    await supabaseClient
-      .from("matches")
-      .insert({
-
-        session_date:
-          currentSession.session_date,
-
-        court_number:
-          courtNumber,
-
-        round_number:
-          roundNumber,
-
-        team1_player1:
-          t1p1,
-
-        team1_player2:
-          t1p2,
-
-        team2_player1:
-          t2p1,
-
-        team2_player2:
-          t2p2,
-
-        bye_player:
-          bye,
-
-        team1_score:
-          score1,
-
-        team2_score:
-          score2
-
-      });
-
-  if(error) {
-
+  if (error) {
     alert(error.message);
-
   } else {
-
-    alert(
-      "Match saved"
-    );
+    alert("Match saved.");
   }
-
 }
 
 initialize();
-
 </script>
 
 </body>
